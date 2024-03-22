@@ -1,0 +1,74 @@
+---
+title: "Assignment 1: Introduction to Time Series"
+output: html_notebook
+---
+
+### Question 1
+
+#### (a)
+
+$$
+\begin{aligned}
+Var(X+Y) &= Var(X) + Var(Y) + 2*Cov(X,Y) \\
+&= Var(X) + Var(Y) + 2*Corr(X,Y)*\sqrt{Var(X)}*\sqrt{Var(Y)} \\
+&= 9 + 4 + 2 * 0.25 * \sqrt{9}*\sqrt{4} \\
+&= 16
+\end{aligned}
+$$
+
+#### (b)
+$$
+\begin{aligned}
+Cov(X,X+Y) &= Cov(X,X)+Cov(X,Y) \\
+&= Var(X) + Corr(X,Y)*\sqrt{Var(X)}*\sqrt{Var(Y)}\\
+&= 9 + 0.25 * \sqrt{9}*\sqrt{4}\\
+&= 10.5
+\end{aligned}
+$$
+
+#### (c)
+$$
+\begin{aligned}
+Corr(X+Y,X-Y) &= \frac{Cov(X+Y, X-Y)}{\sqrt{Var(X+Y)*Var(X-Y)}} \\
+&= \frac{Cov(X,X)-Cov(X,Y)+Cov(Y,X)-Cov(Y,Y)}{\sqrt{(Var(X) + Var(Y) + 2*Corr(X,Y)*\sqrt{Var(X)}*\sqrt{Var(Y)})*(Var(X) + Var(Y) - 2*Corr(X,Y)*\sqrt{Var(X)}*\sqrt{Var(Y)})}}\\
+&= \frac{Var(X)-Var(Y)}{\sqrt{(Var(X) + Var(Y) + 2*Corr(X,Y)*\sqrt{Var(X)}*\sqrt{Var(Y)})*(Var(X) + Var(Y) - 2*Corr(X,Y)*\sqrt{Var(X)}*\sqrt{Var(Y)})}}\\
+&= \frac{9-4}{\sqrt{(9 + 4 + 2 * 0.25 * \sqrt{9}*\sqrt{4})*(9 + 4 - 2 * 0.25 * \sqrt{9}*\sqrt{4})}} \\
+&= \frac{5}{\sqrt{16 * 10}} \\
+&= \frac{1}{8} = 0.125
+\end{aligned}
+$$
+
+### Question 2
+
+$$
+\begin{aligned}
+Cov(X+Y,X-Y) &= Cov(X,X)-Cov(X,Y)+Cov(Y,X)-Cov(Y,Y) \\
+&= Cov(X,X) - Cov(Y,Y) \\
+&= Var(X) - Var(Y) \\
+&= 0 
+\end{aligned}
+$$
+
+
+### Question 3
+
+#### (a)
+
+
+
+#### (b)
+
+#### (c)
+
+
+
+## Q4
+```{r}
+
+```
+
+
+## Q5
+```{r}
+
+```
