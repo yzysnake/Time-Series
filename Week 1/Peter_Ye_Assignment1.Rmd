@@ -98,7 +98,9 @@ For $Y_{t}$, the mean function is a linear function of time which depends on $t$
 
 ## Question 4
 
- (1) --- (A), (2) --- (C), (3) --- (B)
+-   (1) --- (A): The plot (1) shows a series that exhibits fluctuations at a consistent and known interval, indicating a seasonal pattern. Its ACF plot should display a peak at a lag of 12, which is monthly. 
+-   (2) --- (C): There is an upward trend observed, leading to a conclusion that its Autocorrelation Function (ACF) plot would exhibit a positive trend, particularly since the autocovariance decreases as the lag increases.
+-   (3) --- (B): The plot (3) shows a series that exhibits fluctuations at a consistent and known interval, indicating a seasonal pattern. Its ACF plot should display a peak at a lag of 10, which is 10 years spanning from plot (3).
 
 ## Question 5
 
