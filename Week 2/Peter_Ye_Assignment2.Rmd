@@ -1,29 +1,139 @@
 ---
-title: 'Assignment 2:'
-output: pdf_document
-date: "2024-03-26"
+title: 'Assignment 2: Time Series Decomposition'
+author: "Peter Ye"
+date: "2024-03-28"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r warning=FALSE, include=FALSE}
+# Set seed
+set.seed(66)
+Sys.setlocale("LC_ALL", "English_United States.1252")
+
+# Import packages
+suppressPackageStartupMessages(library(quantmod))
+library(tseries)
+library(ggplot2)
+library(fpp)
+library(forecast)
+library(lmtest)
+library(knitr)
+library(kableExtra)
 ```
 
-## R Markdown
+## Question 1
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+# Load visitors.rda data
+load("visitors.rda")
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+# Create a time series object
+visitors_Quarterly <- ts(visitors$Arrivals, start=c(1981,1), frequency=4)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+# Plot the graph
+plot(visitors_Quarterly, main = "Quarterly - International Arrivals to Australia from the US",
+     ylab = "Arrivals", xlab = "Year", col = "red", lwd = 2, cex.main = 1.2, cex.axis = 0.9, 
+     cex.lab = 1, font.main = 2) 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+-   Trend: : There is a clear upward trend over the period, indicating that the number of arrivals has generally increased.
+-   Seasonality: There appears to be a regular pattern within each year, which suggests seasonality. Peaks and troughs recur at similar intervals, suggesting certain times of the year have consistently higher or lower numbers of arrivals.
+-   Cyclic: There are broader fluctuations that occur over several years, which may suggest economic cycles or other long-term factors affecting travel habits.
+
+## Question 2
+
+The previous graph demonstrates the amplitude of seasonal pattern is increasing as the average level of the seasonal data gets larger. Therefore, adopting multiplicative Holt-Winters method is more appropriate.
+
+```{r}
+# Multiplicative decompositionm
+visitors_Quarterly %>% decompose(type = "multiplicative") %>%
+  autoplot() + xlab("Year") +
+  ggtitle("Classical multiplicative decompositionm of International Arrivals to Australia from the US")
+```
+
+\newpage
+
+## Question 3
+
+-   Linear trend with additive seasonality
+
+```{r, fig.width=5.6, fig.height=3.15}
+add_hw <- hw(visitors_Quarterly, h=20 , seasonal="additive",
+           damped=FALSE)
+plot(add_hw)
+```
+
+-   Linear trend with multiplicative seasonality
+
+```{r, fig.width=5.6, fig.height=3.15}
+multi_hw <- hw(visitors_Quarterly, h=20 , seasonal="multiplicative",
+           damped=FALSE)
+plot(multi_hw)
+```
+
+-   Linear trend with additive seasonality and damping
+
+```{r, fig.width=5.6, fig.height=3.15}
+add_damp_hw <- hw(visitors_Quarterly, h=20 , seasonal="additive",
+           damped=TRUE)
+plot(add_damp_hw)
+```
+
+-   Linear trend with multiplicative seasonality and damping
+
+```{r, fig.width=5.6, fig.height=3.15}
+multi_damp_hw <- hw(visitors_Quarterly, h=20 , seasonal="multiplicative",
+           damped=TRUE)
+plot(multi_hw)
+```
+
+\newpage
+
+-   Exponential trend with multiplicative seasonality
+
+```{r, fig.width=5.6, fig.height=3.15}
+multi_expo_hw <- hw(visitors_Quarterly, h=20 , seasonal="multiplicative",
+           damped=FALSE, exponential = TRUE)
+plot(multi_expo_hw)
+```
+
+## Question 4
+
+```{r}
+# Fetch the RMSE value from each method
+rmse_add_hw <- accuracy(add_hw)[1, "RMSE"]
+rmse_multi_hw <- accuracy(multi_hw)[1, "RMSE"]
+rmse_add_damp_hw <- accuracy(add_damp_hw)[1, "RMSE"]
+rmse_multi_damp_hw <- accuracy(multi_damp_hw)[1, "RMSE"]
+rmse_multi_expo_hw <- accuracy(multi_expo_hw)[1, "RMSE"]
+
+# Create a data frame
+methods_df <- data.frame(
+  Method = c("add_hw", "multi_hw", "add_damp_hw", "multi_damp_hw", "multi_expo_hw"),
+  RMSE = c(rmse_add_hw, rmse_multi_hw, rmse_add_damp_hw, rmse_multi_damp_hw, rmse_multi_expo_hw)
+)
+
+# Create a table
+knitr::kable(methods_df, caption = "Forecasting Methods and Their RMSE") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+I prefer to use the method of Linear trend with multiplicative seasonality and damping. This method showcases the lowest Root Mean Square Error (RMSE) value of 7460.002, signifying its superior accuracy and reliability in forecasting with minimal errors.   
+ 
+## Question 5
+
+```{r}
+checkresiduals(multi_damp_hw)
+```
+
+
+## Question 6
+
+## Question 7
+
+### (a)
