@@ -1,14 +1,14 @@
 ---
 title: 'Assignment 2: Time Series Decomposition'
 author: "Peter Ye"
-date: "2024-03-28"
+date: "2024-03-31"
 output:
   pdf_document: default
   html_document:
     df_print: paged
 ---
 
-```{r warning=FALSE, include=FALSE}
+```{r warning=FALSE, echo=TRUE, include=FALSE}
 # Set seed
 set.seed(66)
 Sys.setlocale("LC_ALL", "English_United States.1252")
@@ -127,13 +127,46 @@ I prefer to use the method of Linear trend with multiplicative seasonality and d
  
 ## Question 5
 
-```{r}
+```{r message=FALSE}
 checkresiduals(multi_damp_hw)
 ```
 
+-   Residuals over time: The residuals do not show any apparent trends or patterns over time. However, the variance of residuals becomes smaller after 1950.
+-   ACF of residuals: The autocorrelation of the residuals is low (mostly within the blue confidence bounds), indicating the model has captured the data's time-related patterns well, leaving behind noise.
+-   Histogram of residuals: The residuals are roughly normally distributed as shown by the histogram and the smooth curve, meaning the model's errors are appropriate for the data.
+
+However, the p-value is below the common significance level of 0.05, we reject the null hypothesis of no autocorrelation in the residuals at the 95% confidence level. This suggests that there is evidence of some autocorrelation in the residuals from the Damped Holt-Winters' multiplicative method, which contradicts the earlier assessment from the ACF plot.
+
+```{r}
+summary(multi_damp_hw)
+```
+
+-   alpha: 0.52 suggests moderate weighting to the recent past data
+-   beta:  0.0027 indicates a very small adjustment for the trend, implying the trend is fairly stable.
+-   gamma: 1e-04 is also quite small, suggesting the seasonal component changes very slowly.
+-   phi:  0.98 near 1 indicates a very slow damping of the trend.
+
+Overall, the model seems to be a reasonable fit for the data. The forecast accuracy would be considered acceptable for many practical applications, especially considering the relatively low MAPE.
 
 ## Question 6
+```{r}
+# Create a seasonal naive model
+snaive_forecast <- snaive(visitors_Quarterly, h = 20)
+accuracy(snaive_forecast)
+```
+
+Observing that the RMSE of the seasonal naive method exceeds that of our preferred model indicates that our selected model surpasses the seasonal naive method in forecasting accuracy.
 
 ## Question 7
 
 ### (a)
+
+-   Trend Component: The trend graph shows a general upward trend in the number of persons in the civilian labor force in Australia. This is evident from the consistent increase in the value over time. 
+-   Seasonal Component:  The seasonal graph reveals a consistent pattern that repeats annually, which is typical for labor force data influenced by seasonal hiring patterns, holidays, and similar periodic events. However, the seasonality component has values that fluctuate between approximately -50 and +100, indicating that the seasonal effect is significant but not dominant compared to the overall values of the time series, which are in the thousands.
+-   Remainder Component: The scale shows fluctuations that range up to about ±300, suggesting there are still some unexplained variations in the data after accounting for the trend and seasonal components. Some large spikes, especially downward ones from 1990 to 1995, may indicate outliers or periods of unusual activity that were not captured by the trend or seasonal components.
+
+### (b)
+
+Based on the trend component, there's no obvious sharp decline around 1991/1992 that would be indicative of a recession. The trend continues its upward progression with only minor fluctuations. The seasonal and remainder components don't directly show economic conditions like a recession because they're designed to capture predictable patterns and random noise, respectively.
+
+
