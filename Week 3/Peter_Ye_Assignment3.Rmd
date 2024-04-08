@@ -1,0 +1,230 @@
+---
+title: 'Assignment 3: ARIMA'
+author: "Peter Ye"
+date: "2024-04-08"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r warning=FALSE, echo=TRUE, include=FALSE}
+# Set seed
+Sys.setlocale("LC_ALL", "English_United States.1252")
+
+# Import packages
+suppressPackageStartupMessages(library(quantmod))
+library(tseries)
+library(ggplot2)
+library(TSA)
+library(fpp)
+library(forecast)
+library(lmtest)
+library(knitr)
+library(kableExtra)
+```
+
+## Question 1
+
+```{r}
+# Load usgdp.rda data
+load("usgdp.rda")
+# usgdp$GDP <- usgdp$GDP / 1e12
+
+
+# Split the dataset into training and test sets
+train_data <- subset(usgdp, Year >= 1960 & Year <= 2012)
+test_data <- subset(usgdp, Year >= 2013 & Year <= 2017)
+```
+
+## Question 2
+
+```{r, fig.width=5.6, fig.height=3.15}
+# Plot the training dataset
+plot(train_data$Year, train_data$GDP, type = "l",
+     main = "US GDP from 1960 to 2012",
+     xlab = "Year", ylab = "GDP", col = "red") 
+```
+
+The graph demonstrates the training data is non-stationary and shows an exponential growth trend from 1970 to 2010. This type of trend can lead to non-constant variance in the data. The Box-Cox transformation could potentially be used here to stabilize the variance and make the data more suitable for linear modeling
+
+## Question 3
+
+```{r, fig.width=5.6, fig.height=3.15}
+# Calculate first-order difference
+first_order_diff <- diff(train_data$GDP, differences = 1)
+
+# Plot first-order difference
+plot(first_order_diff, type = "l", main = "First-Order Difference of US GDP",
+     xlab = "Year", ylab = "First-Order Difference", col = "red")
+```
+
+```{r, fig.width=5.6, fig.height=3.15}
+# Calculate second-order difference
+second_order_diff <- diff(train_data$GDP, differences = 2)
+
+# Plot second-order difference
+plot(second_order_diff, type = "l", main = "Second-Order Difference of US GDP",
+     xlab = "Year", ylab = "Second-Order Difference", col = "red")
+```
+
+```{r warning=FALSE}
+# Apply KPSS Test for Stationarity on the first-order difference
+kpss_test_first_order <- kpss.test(first_order_diff)
+
+# Apply KPSS Test for Stationarity on the second-order difference
+kpss_test_second_order <- kpss.test(second_order_diff)
+
+# Print the results
+print(kpss_test_first_order)
+print(kpss_test_second_order)
+```
+Based on the test results: the second-order difference of the data results in a stationary dataset, which has a p-value greater than 0.1 and fails to reject the null hypothesis of stationarity. It implies that the dataset after second-order differencing is stationary.
+
+## Question 4
+
+```{r}
+# Estimate the Box-Cox transformation parameter lambda
+lambda <- BoxCox.lambda(train_data$GDP)
+print(lambda)
+```
+A lambda value of 0.2310656, suggests that a Box-Cox transformation could potentially improve the statistical properties of the dataset, because this value is quite far from 1
+
+```{r}
+# Fit the ARIMA model to the transformed data
+arima_model <- auto.arima(train_data$GDP, lambda = "auto")
+```
+
+```{r}
+# Report the ARIMA model
+summary(arima_model)
+```
+The model is ARIMA(1,1,0), which means it has no autoregressive terms (p=1), it's differenced twice (d=1), and has one moving average term (q=0). The coefficient for the AR1 term is 0.4728, with a standard error of 0.1242, indicating the relationship between a given observation and the one preceding it, adjusted for the differencing. The drift coefficient is 50.3273 with a standard error of 4.3705, which shows the average increase per time unit after adjusting for the AR1 effect.
+
+## Question 5
+
+```{r}
+# Compute the sample Extended ACF
+eacf(train_data$GDP)
+```
+```{r}
+# Define the range for p, d, and q
+p_range <- 0:2
+d_range <- 0:2
+q_range <- 0:2
+
+# Initialize a list to store models
+model_list <- list()
+aic_values <- numeric()
+
+# Loop through possible combinations of p, d, and q
+for(p in p_range) {
+  for(d in d_range) {
+    for(q in q_range) {
+      # Define the ARIMA model with the current p, d, q values
+      model <- Arima(train_data$GDP, order=c(p, d, q), lambda = "auto")
+      
+      # Save the model to the list
+      model_id <- paste("ARIMA", p, d, q, sep="_")
+      model_list[[model_id]] <- model
+      
+      # Save the AICc value
+      aic_values[model_id] <- model[["aicc"]]
+      
+      # Print the summary of the model
+      # cat(paste("ARIMA(", p, ",", d, ",", q, ")\n", sep=""))
+      # print(summary(model))
+      # cat("\n\n")
+    }
+  }
+}
+
+# Find the model with the smallest AICc
+best_model_id <- names(which.min(aic_values))
+best_model <- model_list[[best_model_id]]
+best_aicc <- aic_values[best_model_id]
+
+cat("The best model is ", best_model_id, " with an AICc of ", best_aicc, "\n", sep="")
+
+```
+
+```{r}
+summary(Arima(train_data$GDP, order=c(0, 2, 2), lambda = "auto"))
+```
+The Extended Autocorrelation Function (EACF) indicates that potential models could include configurations such as (p=1, q=1), (p=1, q=2), (p=2, q=0), (p=2, q=1), and (p=2, q=2). This selection of d=2 corroborates the findings from Question 3.
+
+## Question 6
+
+```{r warning=FALSE}
+# Extract forecast for the comparison period
+forecasted_values <- forecast(arima_model, h=5, lambda = lambda,level=c(80, 95))
+
+# Plot the forecast with 80% and 95% confidence intervals
+plot(forecasted_values, main="Forecasted GDP with 80% and 95% Confidence Intervals", xlab="Year", ylab="GDP", col="red")
+```
+
+## Question 7
+
+```{r}
+# Extract forecast estimates for the comparison period
+forecast_estimates <- forecasted_values$mean
+
+# Ensure the order of the 'test_data' matches the forecast period
+test_data <- test_data[order(test_data$Year),]
+
+# Calculate the errors
+errors <- test_data$GDP - forecast_estimates
+
+# Plot the errors
+plot(test_data$Year, errors, type="b", pch=19, col="red", 
+     main="Forecast Errors for 2013-2017", xlab="Year", ylab="Error (Actual - Estimate)")
+```
+
+```{r}
+forecasted_values
+```
+
+The plot demonstrates that the residuals trend upwards over time, suggesting a decline in prediction accuracy with the progression of time.
+
+## Question 8
+
+```{r}
+# Calculate SSE
+arima_sse <- sum(errors^2)
+
+arima_sse
+```
+## Question 9
+
+```{r}
+naive_forecast <- naive(train_data$GDP, h=5, lambda = "auto")
+
+# Calculate errors for the naive forecast
+naive_errors <- test_data$GDP - naive_forecast$mean
+
+# Calculate Sum of Squared Errors (SSE) for the naive forecast
+naive_sse <- sum(naive_errors^2)
+
+```
+
+
+```{r}
+# Compare the SSE of the ARIMA model with the naive forecast
+cat("SSE for ARIMA model:", arima_sse, "\n")
+cat("SSE for Naive forecast:", naive_sse, "\n")
+
+if(arima_sse < naive_sse) {
+  cat("The ARIMA model performed better than the naive approach.\n")
+} else if(arima_sse > naive_sse) {
+  cat("The naive approach performed better than the ARIMA model.\n")
+} else {
+  cat("Both the ARIMA model and the naive approach have the same performance.\n")
+}
+```
+
+
+
+
+
+
+
