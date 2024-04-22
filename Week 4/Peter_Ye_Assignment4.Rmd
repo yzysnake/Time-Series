@@ -1,0 +1,271 @@
+---
+title: 'Assignment 4: ARIMA and sARIMA'
+author: "Peter Ye"
+date: "2024-04-15"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r warning=FALSE, echo=TRUE, include=FALSE}
+# Set seed
+Sys.setlocale("LC_ALL", "English_United States.1252")
+library(reticulate)
+
+# Import packages
+suppressPackageStartupMessages(library(quantmod))
+library(tseries)
+library(ggplot2)
+library(TSA)
+library(fpp)
+library(forecast)
+library(lmtest)
+library(knitr)
+library(kableExtra)
+library(readxl)
+library(writexl)
+```
+
+
+## Question 1
+
+```{python}
+# Use Python to combine file automatically
+
+import os
+import pandas as pd
+from datetime import datetime
+
+# Set the directory
+directory = "Traffic Flow Data"
+
+# Function to parse date from filename
+def parse_date(filename):
+    parts = filename.split('-')
+    year = int(parts[2])
+    month = parts[3]
+    day = int(parts[4].split('.')[0])  # Remove the file extension
+    month_number = datetime.strptime(month, '%B').month
+    return datetime(year, month_number, day)
+
+# List to hold data from each file
+data_frames = []
+
+# Get all Excel files and sort them by date in descending order
+files = [f for f in os.listdir(directory) if f.endswith(".xls") or f.endswith(".xlsx")]
+files.sort(key=parse_date, reverse=False)  # Sort ascending to maintain the file order by date
+
+# Iterate through every file in the sorted list
+for filename in files:
+    file_path = os.path.join(directory, filename)
+    # Determine the appropriate engine based on file extension
+    engine = 'xlrd' if filename.endswith('.xls') else 'openpyxl'
+    try:
+        data = pd.read_excel(file_path, sheet_name='Sheet0', 
+        usecols="E", skiprows=4, nrows=24, engine=engine)
+        data_frames.append(data)
+    except Exception as e:
+        print(f"Failed to process {filename}: {e}")
+
+# Only attempt to concatenate if data_frames is not empty
+if data_frames:
+    combined_data = pd.concat(data_frames, axis=0)  # Concatenate vertically
+    combined_data.columns = ['traffic_flow']  # Rename the single column to 'traffic_flow'
+    combined_data.reset_index(drop=True, inplace=True)  # Reset index to ensure continuous index
+    output_path = os.path.join(directory, 'Combined_Traffic_Flow_Data.xlsx')
+    combined_data.to_excel(output_path, index=False, engine='openpyxl')
+    print(f"Data combined and saved to {output_path}")
+else:
+    print("No valid Excel data to process.")
+```
+
+```{r}
+# Read the combined excel
+traffic <- read_xlsx("Traffic Flow Data/Combined_Traffic_Flow_Data.xlsx")
+```
+
+```{r}
+# Convert it to TS object
+traffic_ts <- ts(traffic$traffic_flow, start=c(1), end=c(384), frequency = 1)
+plot(traffic_ts, xlab = "Time (Hourly from 6/16 to 7/1 2013)", ylab = "Vehicle Count",
+     main = "Hourly Traffic Flow on I80E", col = "blue", type = "l")
+```
+
+-   Trend: : The plot does not appear to show a long-term upward or downward trend, which would indicate an overall increase or decrease in traffic volume over the period observed. The data seems to fluctuate around a constant mean, suggesting stable average traffic counts from June 16, 2013, to July 1, 2013.
+-   Seasonality: The plot displays a very consistent pattern that repeats approximately every 24 hours. This is indicative of daily seasonality, which is a common characteristic in traffic flow data. The regularity of the pattern suggests that daily traffic behaviors are consistent across the observed period.
+-   Variability: There is some variability in the height of the peaks and depths of the troughs, which could be due to variability in daily traffic patterns or could correspond to specific days of the week.
+
+## Question 2
+
+```{r}
+# split the data 
+train <- traffic[1:360,]
+test <- traffic[361:384,]
+
+# Covert the train data into time series object
+train_ts <- ts(train$traffic_flow, start = c(1), end=c(360), frequency = 1)
+```
+
+```{r}
+tsdisplay(train_ts,main='Hourly Traffic from 6/16 to 7/1 2013')
+```
+
+-   ACF: The slow decay of the ACF also suggests a potential non-stationarity in the mean of the time series, which could indicate that differentiating the series might be necessary if building a model.
+-   PACF: It exhibits significant spikes at the first few lags, and then it mostly falls within the confidence interval. This suggests that there is some dependency between an hour and its immediate past hours that is not explained by the overall daily seasonality.
+ 
+
+## Question 3
+
+### Check BoxCox
+
+```{r echo=FALSE, warning=FALSE}
+# Check lambda value
+lambda <- BoxCox.lambda(train_ts)
+lambda
+```
+The lambda is 1.084656 and close to 1, suggesting BoxCox transformation is not necessary
+
+### Check KPSS
+
+```{r warning=FALSE}
+kpss <- kpss.test(train_ts)
+kpss
+```
+The KPSS level at 0.025757 with p-value of 0.1, indicating the data is stationary
+
+### auto-ARIMA model with AICc
+```{r}
+# Fit the auto-ARIMA model with AICc
+auto_arima_model_aicc <- auto.arima(train_ts, ic ="aicc")
+summary(auto_arima_model_aicc)
+```
+```{r}
+# Residuals check
+checkresiduals(auto_arima_model_aicc)
+```
+
+### auto-ARIMA model with BIC
+```{r}
+# Fit the auto-ARIMA model with BIC
+auto_arima_model_bic <- auto.arima(train_ts, ic ="bic")
+summary(auto_arima_model_bic)
+```
+```{r}
+# Residuals check
+checkresiduals(auto_arima_model_bic)
+```
+
+AICc suggests the ARIMA(2,0,3) model while BIC suggests the ARIMA(2,0,2) model. The Ljung-Box test shows a p-value of 0.001033,indicating that there are still autocorrelations in the residuals at lag 10 that the model has not captured. Similarly, the Ljung-Box test for this model also shows a very low p-value 4.704e-05, indicating significant autocorrelation in the residuals.
+
+### EACF
+```{r}
+eacf(train_ts)
+```
+
+The dot on the EACF suggests the ARIMA(4,0,3) is a possible solution. 
+
+```{r}
+# Create Arima(4,0,3) model
+model_manual = Arima(train, order=c(4, 0, 3))
+# Check the autocorrelation
+summary(model_manual)
+```
+
+```{r}
+# Check residuals
+checkresiduals(model_manual) 
+```
+
+The ARIMA(4,0,3) models fail to fully capture the underlying patterns in the data, as evidenced by significant autocorrelation and non-normality in the residuals.
+
+
+## Question 4
+```{r}
+# Create the time series object
+train_ts_weekly <- ts(train$traffic_flow, frequency = 168)
+auto_arima_model_weekly <- auto.arima(train_ts_weekly) 
+```
+
+```{r}
+# Use auto.arima
+summary(auto_arima_model_weekly)
+```
+
+## Question 5
+
+```{r}
+# Forecast the next 24 hours
+forecasted_values_week <- forecast(auto_arima_model_weekly, h=24)
+
+# Plot the forecast
+plot(forecasted_values_week, main="Forecast for July 1st with ARIMA(0,1,2)(0,1,0)[168]")
+```
+
+## Question 6
+
+```{r}
+# Create the time series object with frequency 24 for hourly data over a day
+train_ts_daily <- ts(train$traffic_flow, frequency=24)
+# Use auto.arima
+auto_arima_model_daily <- auto.arima(train_ts_daily, seasonal=TRUE)
+```
+
+```{r}
+summary(auto_arima_model_daily)
+```
+
+## Question 7
+
+```{r}
+# Forecast the next 24 hours
+forecasted_values_day <- forecast(auto_arima_model_daily, h=24)
+
+# Plot the forecast
+plot(forecasted_values_day, main="Forecast for July 1st with from ARIMA(2,0,2)(2,1,0)[24]")
+```
+
+## Question 8
+
+```{r}
+# Extract forecasts for specific times
+times <- c(8, 9, 17, 18)  
+forecast_week_values <- forecasted_values_week$mean[times]
+forecast_day_values <- forecasted_values_day$mean[times]
+
+# Display the forecasts
+data.frame(
+  Time = c("8:00 AM", "9:00 AM", "5:00 PM", "6:00 PM"),
+  Forecast_Week = forecast_week_values,
+  Forecast_Day = forecast_day_values
+)
+
+# extract the actual values for July 1st
+actual_values <- c(traffic[368, "traffic_flow"], 
+                   traffic[369, "traffic_flow"], 
+                   traffic[377, "traffic_flow"],                                                 traffic[378, "traffic_flow"])
+```
+
+```{r}
+# Transform the data type
+actual_values <- as.numeric(actual_values)
+
+# Calculate errors
+mae_week <- mean(abs(forecast_week_values - actual_values))
+mae_hour <- mean(abs(forecast_day_values - actual_values))
+
+calc_rmse <- function(actual, predicted) {
+  sqrt(mean((predicted - actual)^2))
+}
+rmse_week <- calc_rmse(actual_values, forecast_week_values)
+rmse_hour <- calc_rmse(actual_values, forecast_day_values)
+
+# Compare MAE and RMSE
+data.frame(
+  Model = c("auto_arima_model_weekly", "auto_arima_model_hourly"),
+  MAE = c(mae_week, mae_hour),
+  RMSE = c(rmse_week, rmse_hour)
+)
+```
+
+Based on the error, the first model in Q4, demonstrates a better predictive performance with a substantially lower Mean Absolute Error (MAE) and Root Mean Square Error (RMSE) compared to the model in Q6. Lower values for these metrics indicate a closer fit to the actual observed data. Therefore, the auto_arima_model_weekly is preferred for its enhanced accuracy in forecasting.
