@@ -1,0 +1,158 @@
+---
+title: "Group Project"
+author: "Peter Ye"
+date: "2024-04-15"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r message=TRUE, warning=FALSE}
+library(dplyr)
+library(tseries)
+library(ggplot2)
+library(TSA)
+library(fpp)
+library(forecast)
+library(lmtest)
+library(knitr)
+library(kableExtra)
+library(readxl)
+library(writexl)
+```
+
+
+
+## Data Import
+
+```{r}
+# Read csv
+electricity <- read.csv("APUS23A72610.csv")
+```
+
+```{r}
+# Convert the DATE column to a Date type & Rename price column
+electricity <- electricity %>%
+  mutate(DATE = as.Date(DATE)) %>%
+  rename(price = APUS23A72610)
+```
+
+```{r}
+# Filter the data from 2007-01-01 to the most recent
+electricity <- electricity %>% 
+  filter(DATE >= as.Date("2007-01-01"))
+```
+
+```{r}
+# Filter the price data and create a time series object
+electricity$price <- as.numeric(as.character(electricity$price))
+electricity_price = electricity$price
+electricity_price_ts = ts(electricity_price, frequency = 12, start=c(2007, 1), end=c(2024,3))
+```
+
+```{r}
+# Plot the graph
+plot(electricity_price_ts, xlab="Time", ylab="Price per kWh", main="Avg Electricity Price")
+```
+
+## Analysis 
+
+```{r}
+# Perform the Augmented Dickey-Fuller test
+adf_test_result <- adf.test(electricity_price_ts, alternative = "stationary")
+adf_test_result
+```
+
+```{r}
+tsdisplay(electricity_price_ts)
+```
+
+* There's no clear long-term trend. The variability does appear to have some periodicity, with a noticeable pattern of ups and downs. However, the fluctuations don't seem to be strictly regular, and there may be outlier peaks that could be due to specific events or anomalies.
+* The ACF plot shows a sharp drop after the first lag, indicating that the value at one time point is most strongly related to its immediate predecessor. However, there are several other points outside the confidence bounds at later lags, suggesting some degree of seasonal or cyclic behavior 
+* The PACF shows a significant autocorrelation at the first lag and perhaps at the second, but subsequent lags fall within the confidence bounds. This suggests that an AR(1) or AR(2) model might be a good fit for the non-seasonal part of the model.
+
+
+
+
+
+```{r}
+# Find lambda
+lambda <- BoxCox.lambda(electricity_price_ts)
+
+# Apply the Box-Cox transformation
+transformed_electricity_price_ts <- BoxCox(electricity_price_ts, lambda)
+
+lambda
+```
+
+```{r}
+tsdisplay(transformed_electricity_price_ts)
+```
+
+
+
+
+
+
+## Model
+
+### Auto-arima without lambda
+```{r}
+# Create auto arima
+arima_model <- auto.arima(electricity_price, seasonal=TRUE, stepwise = FALSE)
+```
+
+
+```{r}
+# Summary of the fit
+summary(arima_model)
+```
+
+```{r}
+checkresiduals(arima_model)
+```
+
+
+
+
+```{r}
+# Create auto arima
+arima_lambda_model <- auto.arima(electricity_price, seasonal=TRUE, stepwise = FALSE, lambda = "auto")
+```
+
+
+```{r}
+# Summary of the fit
+summary(arima_lambda_model)
+```
+
+```{r}
+checkresiduals(arima_lambda_model)
+```
+
+* These residuals do not show any obvious patterns or trends
+* All the autocorrelations for the lags are within the bounds, suggesting that there is no significant autocorrelation left in the residuals.
+* The residuals here appear to be fairly normally distributed, with perhaps a slight skew to the left.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
